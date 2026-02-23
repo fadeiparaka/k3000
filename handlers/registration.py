@@ -205,7 +205,7 @@ async def change_name(callback: CallbackQuery, state: FSMContext):
     
     await callback.answer()
     await callback.message.edit_text(
-        "Напиши свои имя и фамилию"
+        "Напиши своё имя и фамилию"
     )
 
 
@@ -256,7 +256,7 @@ async def confirm_registration(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
             await callback.message.edit_text(
                 "Поздравляем 🎈 Ты зареган на заслуженный афтыч. "
-                "Вход по регистрациям возможен до 23:59 в день ивента, 27-го февраля.\n\n"
+                "Вход по регистрациям возможен до 23:30 в день ивента, 27-го февраля.\n\n"
                 "<blockquote>Просто назови своё имя и фамилию на входе.</blockquote>",
                 parse_mode="HTML"
             )
