@@ -12,9 +12,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import CommandStart, Command
 import pytz
 
-from config import EVENT_DEADLINE, TIMEZONE, EVENT_ANNOUNCE_LINK, BASE_DIR
 from database import add_or_update_user, update_user_activity, set_user_consented, has_user_consented
-from google_sheets import is_user_registered, register_user, get_sheet_url
+from config import EVENT_DEADLINE, TIMEZONE, EVENT_ANNOUNCE_LINK, BASE_DIR, MAX_PARTICIPANTS
+from google_sheets import is_user_registered, register_user, get_sheet_url, get_registration_count
 from utils import send_thinking, delete_thinking
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,19 @@ def is_registration_deadline_passed() -> bool:
     now = datetime.now(moscow_tz)
     deadline = moscow_tz.localize(EVENT_DEADLINE)
     return now > deadline
+
+def is_registration_limit_reached() -> bool:
+    """
+    Проверяет, достигнут ли лимит участников по данным Google Sheets.
+    Считает только реальные регистрации (строки, кроме заголовка).
+    """
+    try:
+        current_count = get_registration_count()
+        return current_count >= MAX_PARTICIPANTS
+    except Exception as e:
+        logger.error(f"Error checking registration limit: {e}")
+        # На всякий случай не блокируем регистрацию при ошибке
+        return False
 
 
 
@@ -122,13 +135,22 @@ async def register_start(callback: CallbackQuery, state: FSMContext):
     chat_id = callback.message.chat.id
     bot = callback.bot
 
-    # Проверка дедлайна
+        # Проверка дедлайна
     if is_registration_deadline_passed():
         await callback.answer()
         await callback.message.edit_text(
             "Упс. Регистрация закрыта. Следите за анонсами новых событий!"
         )
         return
+
+    # Проверка лимита по количеству регистраций
+    if is_registration_limit_reached():
+        await callback.answer()
+        await callback.message.edit_text(
+            "Упс. Регистрация закрыта. Следите за анонсами новых событий!"
+        )
+        return
+
 
     thinking = await send_thinking(chat_id, bot)
     try:
@@ -217,7 +239,7 @@ async def confirm_registration(callback: CallbackQuery, state: FSMContext):
     chat_id = callback.message.chat.id
     bot = callback.bot
 
-    # Повторная проверка дедлайна
+        # Повторная проверка дедлайна
     if is_registration_deadline_passed():
         await callback.answer()
         await callback.message.edit_text(
@@ -225,6 +247,16 @@ async def confirm_registration(callback: CallbackQuery, state: FSMContext):
         )
         await state.clear()
         return
+
+    # Повторная проверка лимита (на случай гонок)
+    if is_registration_limit_reached():
+        await callback.answer()
+        await callback.message.edit_text(
+            "Упс. Регистрация закрыта. Следите за анонсами новых событий!"
+        )
+        await state.clear()
+        return
+
 
     # Получаем данные из состояния
     data = await state.get_data()
