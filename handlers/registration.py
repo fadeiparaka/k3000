@@ -147,7 +147,7 @@ async def register_start(callback: CallbackQuery, state: FSMContext):
     if is_registration_limit_reached():
         await callback.answer()
         await callback.message.edit_text(
-            "Упс. Регистрация закрыта. Следите за анонсами новых событий!"
+            "Упс. Превышен лимит мест в списках. Регистрация закрыта. Недорогие билеты на афтыч можно приобрести на сайте www.k-30.com"
         )
         return
 
@@ -252,7 +252,7 @@ async def confirm_registration(callback: CallbackQuery, state: FSMContext):
     if is_registration_limit_reached():
         await callback.answer()
         await callback.message.edit_text(
-            "Упс. Регистрация закрыта. Следите за анонсами новых событий!"
+            "Упс. Превышен лимит мест в списках. Регистрация закрыта. Недорогие билеты на афтыч можно приобрести на сайте www.k-30.com"
         )
         await state.clear()
         return

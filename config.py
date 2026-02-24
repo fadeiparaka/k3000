@@ -59,4 +59,4 @@ DATABASE_PATH = str(BASE_DIR / "users.db")
 REMINDER_1_DATETIME = datetime(2026, 2, 26, 14, 0)  # 26 февраля в 14:00
 REMINDER_2_DATETIME = datetime(2026, 2, 27, 10, 0)  # 27 февраля в 10:00
 
-MAX_PARTICIPANTS = 1000
+MAX_PARTICIPANTS = 750
