@@ -141,13 +141,51 @@ async def cmd_privacy(message: Message):
 
 @router.callback_query(F.data == "register_start")
 async def register_start(callback: CallbackQuery, state: FSMContext):
-    """Редирект для старых кнопок 'Бесплатная рега'"""
-    await state.clear()
-    await callback.answer()
-    await callback.message.edit_text(
-        "Салют, это бот К-30! Что тебя интересует?",
-        reply_markup=get_main_menu_keyboard()
-    )
+    """Начало процесса регистрации"""
+    user_id = callback.from_user.id
+    chat_id = callback.message.chat.id
+    bot = callback.bot
+
+        # Проверка дедлайна
+    if is_registration_deadline_passed():
+        await callback.answer()
+        await callback.message.edit_text(
+            "Упс. Регистрация закрыта. Следите за анонсами новых событий!"
+        )
+        return
+
+    # Проверка лимита по количеству регистраций
+    if is_registration_limit_reached():
+        await callback.answer()
+        await callback.message.edit_text(
+            "Упс. Превышен лимит мест в списках. Регистрация закрыта. Недорогие билеты на афтыч можно приобрести на сайте www.k-30.com"
+        )
+        return
+
+
+    thinking = await send_thinking(chat_id, bot)
+    try:
+        # Проверка, не зарегистрирован ли уже (обращение к Google Sheets)
+        if is_user_registered(user_id):
+            await callback.answer()
+            await callback.message.edit_text(
+                "Ты уже в списке. Ждём 27 февраля на афтыче!"
+            )
+            return
+
+        # Переходим в состояние ожидания имени
+        await state.set_state(RegistrationStates.waiting_for_name)
+
+        await callback.answer()
+        await callback.message.edit_text(
+            "Одна рега - один человек. Регистрация закроется в 18:00, 26-го февраля или если места закончатся.\n\n"
+            "<i>Рега не отменяет фейсконтроль, так что принарядись и будь вежлив на входе</i> 👫\n\n"
+            "<blockquote>Не регайся, если не уверен, что сможешь прийти.</blockquote>\n\n"
+            "<b>Напиши своё имя и фамилию ниже одним сообщением и ты окажешься в списке на входе</b> 👇",
+            parse_mode="HTML"
+        )
+    finally:
+        await delete_thinking(thinking)
 
 
 @router.message(RegistrationStates.waiting_for_name, F.text)
