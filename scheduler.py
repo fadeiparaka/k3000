@@ -110,22 +110,22 @@ def setup_scheduler(bot) -> AsyncIOScheduler:
 
     # REMINDER_1_DATETIME и REMINDER_2_DATETIME — naive datetime (без tz),
     # например datetime(2026, 2, 26, 22, 0, 0)
-    reminder_1_dt = moscow_tz.localize(REMINDER_1_DATETIME)
+    # reminder_1_dt = moscow_tz.localize(REMINDER_1_DATETIME)
     reminder_2_dt = moscow_tz.localize(REMINDER_2_DATETIME)
 
     now = datetime.now(moscow_tz)
 
-    if reminder_1_dt <= now:
-        logger.warning("REMINDER_1_DATETIME в прошлом — напоминание 1 не будет запланировано")
-    else:
-        scheduler.add_job(
-            send_reminder_1,
-            trigger=DateTrigger(run_date=reminder_1_dt),
-            args=[bot],
-            id="reminder_1",
-            replace_existing=True
-        )
-        logger.info(f"Reminder 1 scheduled at {reminder_1_dt}")
+    # if reminder_1_dt <= now:
+    #     logger.warning("REMINDER_1_DATETIME в прошлом — напоминание 1 не будет запланировано")
+    # else:
+    #     scheduler.add_job(
+    #         send_reminder_1,
+    #         trigger=DateTrigger(run_date=reminder_1_dt),
+    #         args=[bot],
+    #         id="reminder_1",
+    #         replace_existing=True
+    #     )
+    #     logger.info(f"Reminder 1 scheduled at {reminder_1_dt}")
 
     if reminder_2_dt <= now:
         logger.warning("REMINDER_2_DATETIME в прошлом — напоминание 2 не будет запланировано")
