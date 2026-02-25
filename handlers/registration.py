@@ -75,8 +75,9 @@ def validate_name(name: str) -> tuple[bool, Optional[str]]:
 def get_main_menu_keyboard():
     """Клавиатура главного меню"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Бесплатная рега", callback_data="register_start")]
+        [InlineKeyboardButton(text="Получить фотоотчёт с открытия", callback_data="get_photos")]
     ])
+
 
 
 def get_consent_keyboard():
@@ -108,8 +109,18 @@ async def consent_continue(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
     await callback.message.edit_text(
-        "27-го февраля делаем мощный афтыч открытия К-30. Ты с нами?",
+        "Салют, это бот К-30! Что тебя интересует?",
         reply_markup=get_main_menu_keyboard()
+    )
+
+@router.callback_query(F.data == "get_photos")
+async def get_photos(callback: CallbackQuery):
+    """Отправка ссылки на фотоотчёт"""
+    await callback.answer()
+    await callback.message.edit_text(
+        "📸 Фотоотчёт с открытия К-30:\n\n"
+        "<a href=\"https://disk.yandex.ru/d/57-PurZMePCrvQ\">Посмотреть фотоотчёт</a>",
+        parse_mode="HTML"
     )
 
 
@@ -324,6 +335,6 @@ async def handle_unknown_message(message: Message):
         return
 
     await message.answer(
-        "27-го февраля делаем мощный афтыч открытия К-30. Ты с нами?",
+        "Салют, это бот К-30! Что тебя интересует?",
         reply_markup=get_main_menu_keyboard()
     )
