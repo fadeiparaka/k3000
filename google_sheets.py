@@ -137,3 +137,16 @@ def get_registration_count() -> int:
 def get_sheet_url() -> str:
     """Возвращает URL Google Sheets таблицы"""
     return f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}"
+
+def get_all_registered_ids() -> set:
+    """Возвращает set всех user_id из Google Sheets одним запросом"""
+    try:
+        worksheet = get_worksheet()
+        user_ids = worksheet.col_values(1)  # один запрос к API
+        # убираем заголовок "User ID"
+        if user_ids and user_ids[0] == "User ID":
+            user_ids = user_ids[1:]
+        return set(str(uid) for uid in user_ids if uid)
+    except Exception as e:
+        logger.error(f"Error getting all registered ids: {e}")
+        return set()

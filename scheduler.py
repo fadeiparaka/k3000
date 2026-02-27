@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 import pytz
+import asyncio
 
 from config import REMINDER_1_DATETIME, REMINDER_2_DATETIME, TIMEZONE, EVENT_ANNOUNCE_LINK
 from database import get_all_users, remove_user, update_user_activity
@@ -60,15 +61,16 @@ async def send_reminder_1(bot):
 
 
 async def send_reminder_2(bot):
-    """
-    Напоминание 27 февраля в 10:00
-    Отправляется только зарегистрированным пользователям
-    """
-    logger.info("Sending reminder 2 (27.02 10:00)")
-    
+    logger.info("Sending reminder 2 (27.02 14:00)")
+
     users = get_all_users()
     success_count = 0
     failed_count = 0
+
+    # Один запрос к Google Sheets вместо 750
+    from google_sheets import get_all_registered_ids
+    registered_ids = get_all_registered_ids()
+    logger.info(f"Registered users in sheet: {len(registered_ids)}")
     
     # Текст с вшитой ссылкой
     text = (
@@ -98,10 +100,9 @@ async def send_reminder_2(bot):
     )
     
     for user_id, username in users:
-        # Проверяем, зарегистрирован ли пользователь
-        if not is_user_registered(user_id):
+        if str(user_id) not in registered_ids:
             continue
-        
+
         try:
             await bot.send_message(
                 chat_id=user_id,
@@ -110,18 +111,11 @@ async def send_reminder_2(bot):
             )
             update_user_activity(user_id)
             success_count += 1
-        except TelegramBadRequest as e:
-            if "bot was blocked" in str(e).lower() or "403" in str(e):
-                logger.info(f"User {user_id} blocked the bot, removing from database")
-                remove_user(user_id)
-                failed_count += 1
-            else:
-                logger.error(f"Error sending reminder 2 to user {user_id}: {e}")
-                failed_count += 1
+            await asyncio.sleep(0.05)  # ← 50ms пауза, ~20 сообщений/сек
         except Exception as e:
-            logger.error(f"Unexpected error sending reminder 2 to user {user_id}: {e}")
+            logger.error(f"Error sending to {user_id}: {e}")
             failed_count += 1
-    
+
     logger.info(f"Reminder 2 sent: success={success_count}, failed={failed_count}")
 
 
