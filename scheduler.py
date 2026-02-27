@@ -94,7 +94,7 @@ async def send_reminder_2(bot):
         "01:00 - Lena Popova\n"
         "03:00 - Texture\n"
         "05:00 - end\n\n"
-        "До встречи 👋",
+        "До встречи 👋"
     )
     
     for user_id, username in users:
