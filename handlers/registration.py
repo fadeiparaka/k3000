@@ -75,7 +75,7 @@ def validate_name(name: str) -> tuple[bool, Optional[str]]:
 
 def get_main_menu_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Ранний доступ на Формы Прослушивания", callback_data="early_access")],
+        [InlineKeyboardButton(text="Ранний доступ на Формы Прослушивания (13.03)", callback_data="early_access")],
         [InlineKeyboardButton(text="Я забыл свои вещи в К-30", callback_data="lost_item")]
     ])
 
