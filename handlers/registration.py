@@ -284,7 +284,9 @@ async def confirm_registration(callback: CallbackQuery, state: FSMContext):
 
 @router.message()
 async def handle_unknown_message(message: Message):
-    """Обработчик неизвестных сообщений — главное меню только если согласие дано"""
+    if message.chat.type != "private":
+        return  # ← ЭТА СТРОКА
+    
     user_id = message.from_user.id
     username = message.from_user.username
     add_or_update_user(user_id, username)
