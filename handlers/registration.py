@@ -12,8 +12,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import CommandStart, Command
 import pytz
 
-from database import add_or_update_user, update_user_activity, set_user_consented, has_user_consented
-from config import EVENT_DEADLINE, TIMEZONE, EVENT_ANNOUNCE_LINK, BASE_DIR, MAX_PARTICIPANTS
+
+from config import EVENT_DEADLINE, TIMEZONE, EVENT_ANNOUNCE_LINK, BASE_DIR, MAX_PARTICIPANTS, EARLY_ACCESS_LINK
+from database import add_or_update_user, update_user_activity, set_user_consented, has_user_consented, add_early_access_user, is_early_access_user
 from google_sheets import is_user_registered, register_user, get_sheet_url, get_registration_count
 from utils import send_thinking, delete_thinking
 
@@ -73,11 +74,10 @@ def validate_name(name: str) -> tuple[bool, Optional[str]]:
 
 
 def get_main_menu_keyboard():
-    """Клавиатура главного меню"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Получить фотоотчёт с открытия", callback_data="get_photos")]
+        [InlineKeyboardButton(text="Ранний доступ на Формы Прослушивания", callback_data="early_access")],
+        [InlineKeyboardButton(text="Я забыл свои вещи в К-30", callback_data="lost_item")]
     ])
-
 
 
 def get_consent_keyboard():
@@ -113,15 +113,47 @@ async def consent_continue(callback: CallbackQuery, state: FSMContext):
         reply_markup=get_main_menu_keyboard()
     )
 
-@router.callback_query(F.data == "get_photos")
-async def get_photos(callback: CallbackQuery):
-    """Отправка ссылки на фотоотчёт"""
+@router.callback_query(F.data == "early_access")
+async def early_access_info(callback: CallbackQuery):
+    """Экран с описанием раннего доступа"""
     await callback.answer()
     await callback.message.edit_text(
-        "📸 Фотоотчёт с открытия К-30:\n\n"
-        "<a href=\"https://disk.yandex.ru/d/57-PurZMePCrvQ\">Посмотреть фотоотчёт</a>",
-        parse_mode="HTML"
+        "Поздравляем, ты получил ранний доступ к вечеринке Формы Прослушивания.\n\n"
+        "<b>Что это значит?</b>\n\n"
+        "• Мы пришлем ссылку на приобретение билета всего за 500 рублей\n"
+        "• Ссылка может перестать работать в любой момент, не откладывай\n"
+        "• Вход по таким билетам возможен только до 00:30 в ночь события\n"
+        "• Билет придет на почту, которую ты укажешь при покупке",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Получить секретную ссылку", callback_data="early_access_get_link")]
+        ])
     )
+
+
+@router.callback_query(F.data == "early_access_get_link")
+async def early_access_get_link(callback: CallbackQuery):
+    """Выдача ссылки + трекинг пользователя"""
+    user_id = callback.from_user.id
+    username = callback.from_user.username
+
+    add_early_access_user(user_id, username)
+
+    await callback.answer()
+    await callback.message.edit_text(
+        f"А вот и заветная ссылка 👉 {EARLY_ACCESS_LINK}"
+    )
+
+
+@router.callback_query(F.data == "get_photos")
+async def get_photos_redirect(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.answer()
+    await callback.message.edit_text(
+        "Салют, это бот К-30! Что тебя интересует?",
+        reply_markup=get_main_menu_keyboard()
+    )
+
 
 
 @router.message(Command("privacy"))
@@ -140,14 +172,14 @@ async def cmd_privacy(message: Message):
 
 
 @router.callback_query(F.data == "register_start")
-async def register_start(callback: CallbackQuery, state: FSMContext):
-    """Редирект для старых кнопок 'Бесплатная рега'"""
+async def register_start_redirect(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
     await callback.message.edit_text(
         "Салют, это бот К-30! Что тебя интересует?",
         reply_markup=get_main_menu_keyboard()
     )
+
 
 
 @router.message(RegistrationStates.waiting_for_name, F.text)
@@ -283,10 +315,15 @@ async def confirm_registration(callback: CallbackQuery, state: FSMContext):
 
 
 @router.message()
-async def handle_unknown_message(message: Message):
+async def handle_unknown_message(message: Message, state: FSMContext):
     if message.chat.type != "private":
-        return  # ← ЭТА СТРОКА
-    
+        return
+
+    # Если пользователь в каком-то состоянии FSM — не перехватываем
+    current_state = await state.get_state()
+    if current_state is not None:
+        return
+
     user_id = message.from_user.id
     username = message.from_user.username
     add_or_update_user(user_id, username)

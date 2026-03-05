@@ -39,6 +39,13 @@ def init_database():
             consented_at TEXT NOT NULL
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS early_access (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """) 
     conn.commit()
     
     # Проверяем, что таблицы созданы
@@ -47,6 +54,7 @@ def init_database():
     conn.close()
     
     logger.info(f"Database initialized. Tables: {', '.join(tables)}")
+
 
 
 def add_or_update_user(user_id: int, username: Optional[str] = None):
@@ -185,3 +193,49 @@ def get_user_count() -> int:
     
     conn.close()
     return count
+
+def init_early_access_table():
+    """Создаёт таблицу early_access если не существует"""
+    with sqlite3.connect(DATABASE_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS early_access (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        logger.info("Table early_access ready")
+
+
+def add_early_access_user(user_id: int, username: Optional[str] = None) -> bool:
+    """Добавляет пользователя в early_access. Возвращает True если добавлен впервые"""
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR IGNORE INTO early_access (user_id, username) VALUES (?, ?)",
+                (user_id, username)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error adding early access user {user_id}: {e}")
+        return False
+
+
+def is_early_access_user(user_id: int) -> bool:
+    """Проверяет, получал ли пользователь уже ссылку"""
+    with sqlite3.connect(DATABASE_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM early_access WHERE user_id = ?", (user_id,))
+        return cursor.fetchone() is not None
+
+
+def get_all_early_access_users() -> list:
+    """Возвращает всех пользователей из early_access"""
+    with sqlite3.connect(DATABASE_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, username FROM early_access")
+        return cursor.fetchall()

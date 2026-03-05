@@ -8,8 +8,8 @@ from apscheduler.triggers.date import DateTrigger
 import pytz
 import asyncio
 
-from config import REMINDER_1_DATETIME, REMINDER_2_DATETIME, TIMEZONE, EVENT_ANNOUNCE_LINK
-from database import get_all_users, remove_user, update_user_activity
+from config import REMINDER_1_DATETIME, REMINDER_2_DATETIME, TIMEZONE, EVENT_ANNOUNCE_LINK, EARLY_ACCESS_REMINDER_DATETIME, EARLY_ACCESS_LINK
+from database import get_all_users, remove_user, update_user_activity, get_all_early_access_users
 from google_sheets import is_user_registered
 from aiogram.exceptions import TelegramBadRequest
 
@@ -118,6 +118,44 @@ async def send_reminder_2(bot):
 
     logger.info(f"Reminder 2 sent: success={success_count}, failed={failed_count}")
 
+async def send_early_access_reminder(bot):
+    """
+    Напоминание за день до конца ссылки раннего доступа.
+    Отправляется только тем, кто получал ссылку (таблица early_access).
+    """
+    logger.info("Sending early access reminder")
+
+    users = get_all_early_access_users()
+    success_count = 0
+    failed_count = 0
+
+    text = (
+        "⚡️ Напоминаем: ссылка на билет за 500 рублей на Формы Прослушивания "
+        "перестанет работать уже завтра.\n\n"
+        f"Успей купить 👉 {EARLY_ACCESS_LINK}"
+    )
+
+    for user_id, username in users:
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=text
+            )
+            success_count += 1
+            await asyncio.sleep(0.05)
+        except TelegramBadRequest as e:
+            if "bot was blocked" in str(e).lower():
+                logger.info(f"User {user_id} blocked the bot")
+            else:
+                logger.error(f"Error sending early access reminder to {user_id}: {e}")
+            failed_count += 1
+        except Exception as e:
+            logger.error(f"Unexpected error sending to {user_id}: {e}")
+            failed_count += 1
+
+    logger.info(f"Early access reminder sent: success={success_count}, failed={failed_count}")
+
+
 
 def setup_scheduler(bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone=moscow_tz)
@@ -125,7 +163,8 @@ def setup_scheduler(bot) -> AsyncIOScheduler:
     # REMINDER_1_DATETIME и REMINDER_2_DATETIME — naive datetime (без tz),
     # например datetime(2026, 2, 26, 22, 0, 0)
     # reminder_1_dt = moscow_tz.localize(REMINDER_1_DATETIME)
-    reminder_2_dt = moscow_tz.localize(REMINDER_2_DATETIME)
+    # reminder_2_dt = moscow_tz.localize(REMINDER_2_DATETIME)
+    early_access_reminder_dt = moscow_tz.localize(EARLY_ACCESS_REMINDER_DATETIME)
 
     now = datetime.now(moscow_tz)
 
@@ -141,20 +180,32 @@ def setup_scheduler(bot) -> AsyncIOScheduler:
     #     )
     #     logger.info(f"Reminder 1 scheduled at {reminder_1_dt}")
 
-    if reminder_2_dt <= now:
-        logger.warning("REMINDER_2_DATETIME в прошлом — напоминание 2 не будет запланировано")
+    # if reminder_2_dt <= now:
+    #     logger.warning("REMINDER_2_DATETIME в прошлом — напоминание 2 не будет запланировано")
+    # else:
+    #     scheduler.add_job(
+    #         send_reminder_2,
+    #         trigger=DateTrigger(run_date=reminder_2_dt),
+    #         args=[bot],
+    #         id="reminder_2",
+    #         replace_existing=True
+    #     )
+    #     logger.info(f"Reminder 2 scheduled at {reminder_2_dt}")
+
+    if early_access_reminder_dt <= now:
+        logger.warning("EARLY_ACCESS_REMINDER_DATETIME в прошлом — не будет запланировано")
     else:
         scheduler.add_job(
-            send_reminder_2,
-            trigger=DateTrigger(run_date=reminder_2_dt),
+            send_early_access_reminder,
+            trigger=DateTrigger(run_date=early_access_reminder_dt),
             args=[bot],
-            id="reminder_2",
+            id="early_access_reminder",
             replace_existing=True
         )
-        logger.info(f"Reminder 2 scheduled at {reminder_2_dt}")
+        logger.info(f"Early access reminder scheduled at {early_access_reminder_dt}")
 
     scheduler.start()
     logger.info("Scheduler started")
     return scheduler
-
+    
 

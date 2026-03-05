@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
 from database import init_database
 from google_sheets import init_sheet_headers
-from handlers import registration, admin
+from handlers import registration, admin, lost_items
 from scheduler import setup_scheduler
 
 # Настройка логирования
@@ -47,9 +47,11 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # Регистрация роутеров (админ первым, чтобы /stats и /post не перехватывались общим handler)
+    
+    dp.include_router(lost_items.router)
     dp.include_router(admin.router)
     dp.include_router(registration.router)
+    
 
     # Настройка планировщика
     scheduler = setup_scheduler(bot)
