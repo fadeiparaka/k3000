@@ -62,7 +62,7 @@ REMINDER_2_DATETIME = datetime(2026, 2, 27, 14, 0)  # 27 февраля в 10:00
 MAX_PARTICIPANTS = 750
 
 # Early Access
-EARLY_ACCESS_LINK = "https://vk.cc/cV7rah"
+EARLY_ACCESS_LINK = "https://tinyurl.com/k30FAM"
 EARLY_ACCESS_REMINDER_DATETIME = datetime(2026, 6, 19, 13, 0)  # за день до дедлайна
 
 # Lost Items
