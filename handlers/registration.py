@@ -76,6 +76,7 @@ def validate_name(name: str) -> tuple[bool, Optional[str]]:
 def get_main_menu_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Ранний доступ на Формы Прослушивания (13.03)", callback_data="early_access")],
+        [InlineKeyboardButton(text="Получить фотоотчёт", callback_data="get_photos")],
         [InlineKeyboardButton(text="Я забыл свои вещи в К-30", callback_data="lost_item")]
     ])
 
@@ -146,14 +147,13 @@ async def early_access_get_link(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "get_photos")
-async def get_photos_redirect(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
+async def get_photos_redirect(callback: CallbackQuery):
     await callback.answer()
     await callback.message.edit_text(
-        "Салют, это бот К-30! Что тебя интересует?",
-        reply_markup=get_main_menu_keyboard()
+        "Фотоотчёт первой большой вечеринки после открытия\n\n"
+        '<a href="https://disk.yandex.ru/d/9hMCg2epPtHBqg">Посмотреть</a>',
+        parse_mode="HTML"
     )
-
 
 
 @router.message(Command("privacy"))
