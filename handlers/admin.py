@@ -23,6 +23,25 @@ def is_admin(user_id: int) -> bool:
     """Проверяет, является ли пользователь админом"""
     return user_id in ADMINS
 
+@router.message(Command("dm"))
+async def cmd_dm(message: Message):
+    if message.from_user.id not in ADMINS:
+        await message.answer("Нет прав.")
+        return
+
+    args = message.text.split(maxsplit=2)
+    if len(args) < 3 or not args[1].lstrip('-').isdigit():
+        await message.answer("Использование: /dm <chat_id> <текст>")
+        return
+
+    chat_id = int(args[1])
+    text = args[2]
+
+    try:
+        await message.bot.send_message(chat_id=chat_id, text=text)
+        await message.answer(f"✅ Сообщение доставлено пользователю {chat_id}")
+    except Exception as e:
+        await message.answer(f"❌ Не удалось отправить: {e}")
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message):
