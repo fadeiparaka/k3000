@@ -150,8 +150,8 @@ async def early_access_get_link(callback: CallbackQuery):
 async def get_photos_redirect(callback: CallbackQuery):
     await callback.answer()
     await callback.message.edit_text(
-        "Фотоотчёт первой большой вечеринки после открытия\n\n"
-        '<a href="https://disk.yandex.ru/d/9hMCg2epPtHBqg">Посмотреть</a>',
+        "Фотоотчёт «Новый Свет»\n\n"
+        '<a href="https://disk.yandex.ru/d/8imwOmqTqyIlmg">Посмотреть</a>',
         parse_mode="HTML"
     )
 

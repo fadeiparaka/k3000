@@ -63,7 +63,7 @@ MAX_PARTICIPANTS = 750
 
 # Early Access
 EARLY_ACCESS_LINK = "https://tinyurl.com/k30FAM"
-EARLY_ACCESS_REMINDER_DATETIME = datetime(2026, 6, 19, 13, 0)  # за день до дедлайна
+EARLY_ACCESS_REMINDER_DATETIME = datetime(2026, 2, 19, 13, 0)  # за день до дедлайна
 
 # Lost Items
 LOST_ITEMS_CHAT_ID = int(os.getenv("LOST_ITEMS_CHAT_ID", "0"))
