@@ -16,6 +16,7 @@ import pytz
 from config import EVENT_DEADLINE, TIMEZONE, EVENT_ANNOUNCE_LINK, BASE_DIR, MAX_PARTICIPANTS, EARLY_ACCESS_LINK
 from database import add_or_update_user, update_user_activity, set_user_consented, has_user_consented, add_early_access_user, is_early_access_user
 from google_sheets import is_user_registered, register_user, get_sheet_url, get_registration_count
+from menu_service import build_root_keyboard, get_main_greeting, send_reply_menu_if_any
 from utils import send_thinking, delete_thinking
 
 logger = logging.getLogger(__name__)
@@ -74,11 +75,7 @@ def validate_name(name: str) -> tuple[bool, Optional[str]]:
 
 
 def get_main_menu_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Ранний доступ на Формы Прослушивания (13.03)", callback_data="early_access")],
-        [InlineKeyboardButton(text="Получить фотоотчёт", callback_data="get_photos")],
-        [InlineKeyboardButton(text="Я забыл свои вещи в К-30", callback_data="lost_item")]
-    ])
+    return build_root_keyboard()
 
 
 def get_consent_keyboard():
@@ -110,9 +107,10 @@ async def consent_continue(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
     await callback.message.edit_text(
-        "Салют, это бот К-30! Что тебя интересует?",
+        get_main_greeting(),
         reply_markup=get_main_menu_keyboard()
     )
+    await send_reply_menu_if_any(callback.message)
 
 @router.callback_query(F.data == "early_access")
 async def early_access_info(callback: CallbackQuery):
@@ -176,9 +174,10 @@ async def register_start_redirect(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
     await callback.message.edit_text(
-        "Салют, это бот К-30! Что тебя интересует?",
+        get_main_greeting(),
         reply_markup=get_main_menu_keyboard()
     )
+    await send_reply_menu_if_any(callback.message)
 
 
 
@@ -336,6 +335,7 @@ async def handle_unknown_message(message: Message, state: FSMContext):
         return
 
     await message.answer(
-        "Салют, это бот К-30! Что тебя интересует?",
+        get_main_greeting(),
         reply_markup=get_main_menu_keyboard()
     )
+    await send_reply_menu_if_any(message)

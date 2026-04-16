@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
 from database import init_database
 from google_sheets import init_sheet_headers
-from handlers import registration, admin, lost_items
+from handlers import registration, admin, lost_items, dynamic_menu, menu_admin
 from scheduler import setup_scheduler
 
 # Настройка логирования
@@ -50,6 +50,8 @@ async def main():
     
     dp.include_router(lost_items.router)
     dp.include_router(admin.router)
+    dp.include_router(menu_admin.router)
+    dp.include_router(dynamic_menu.router)
     dp.include_router(registration.router)
     
 
