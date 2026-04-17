@@ -327,7 +327,8 @@ async def choose_add_parent(message: Message, state: FSMContext):
         await message.answer("Выбери вариант кнопкой ниже.")
         return
     node = get_menu_node(node_id)
-    if node and (node["kind"] == "url" or node.get("content_type") == "album"):
+    menu_type = data.get("menu_type", "inline")
+    if node and (node["kind"] == "url" or (menu_type == "inline" and node.get("content_type") == "album")):
         await message.answer("Внутри этой кнопки нельзя создать вложенные кнопки.")
         return
     await state.update_data(current_parent_id=node_id)
@@ -588,7 +589,8 @@ async def _ask_edit_part(message: Message, state: FSMContext):
         labels.append(BTN_URL)
     else:
         labels.append(BTN_EDIT_CONTENT)
-    if node and node["kind"] != "url" and node.get("content_type") != "album" and list_menu_children(node["id"], menu_type=menu_type):
+    blocks_children = menu_type == "inline" and node and node.get("content_type") == "album"
+    if node and node["kind"] != "url" and not blocks_children and list_menu_children(node["id"], menu_type=menu_type):
         labels.append(BTN_EDIT_CHILDREN)
     labels.extend([BTN_BACK, BTN_CANCEL])
     await state.set_state(MenuAdminStates.choosing_edit_part)

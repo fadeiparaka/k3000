@@ -110,7 +110,7 @@ async def consent_continue(callback: CallbackQuery, state: FSMContext):
         get_main_greeting(),
         reply_markup=get_main_menu_keyboard()
     )
-    await send_reply_menu_if_any(callback.message)
+    await send_reply_menu_if_any(callback.message, user_id=callback.from_user.id)
 
 @router.callback_query(F.data == "early_access")
 async def early_access_info(callback: CallbackQuery):
@@ -177,7 +177,7 @@ async def register_start_redirect(callback: CallbackQuery, state: FSMContext):
         get_main_greeting(),
         reply_markup=get_main_menu_keyboard()
     )
-    await send_reply_menu_if_any(callback.message)
+    await send_reply_menu_if_any(callback.message, user_id=callback.from_user.id)
 
 
 

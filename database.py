@@ -3,6 +3,7 @@
 """
 import sqlite3
 import logging
+import json
 from datetime import datetime
 from typing import Optional, List, Tuple, Any
 from config import DATABASE_PATH, TIMEZONE, EARLY_ACCESS_LINK
@@ -95,6 +96,8 @@ def init_database():
         CREATE TABLE IF NOT EXISTS user_reply_menu_state (
             user_id INTEGER PRIMARY KEY,
             parent_id INTEGER,
+            menu_message_id INTEGER,
+            reply_message_ids TEXT,
             updated_at TEXT NOT NULL
         )
     """)
@@ -120,6 +123,13 @@ def _ensure_menu_schema(cursor: sqlite3.Cursor):
     columns = {row["name"] for row in cursor.fetchall()}
     if "menu_type" not in columns:
         cursor.execute("ALTER TABLE menu_nodes ADD COLUMN menu_type TEXT NOT NULL DEFAULT 'inline'")
+
+    cursor.execute("PRAGMA table_info(user_reply_menu_state)")
+    columns = {row["name"] for row in cursor.fetchall()}
+    if "menu_message_id" not in columns:
+        cursor.execute("ALTER TABLE user_reply_menu_state ADD COLUMN menu_message_id INTEGER")
+    if "reply_message_ids" not in columns:
+        cursor.execute("ALTER TABLE user_reply_menu_state ADD COLUMN reply_message_ids TEXT")
 
 
 def _ensure_menu_seed(cursor: sqlite3.Cursor):
@@ -490,9 +500,65 @@ def set_user_reply_menu_parent(user_id: int, parent_id: int | None):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT OR REPLACE INTO user_reply_menu_state (user_id, parent_id, updated_at)
+        INSERT INTO user_reply_menu_state (user_id, parent_id, updated_at)
         VALUES (?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            parent_id = excluded.parent_id,
+            updated_at = excluded.updated_at
     """, (user_id, parent_id, _now_iso()))
+    conn.commit()
+    conn.close()
+
+
+def get_user_reply_menu_message(user_id: int) -> int | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT menu_message_id FROM user_reply_menu_state WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row["menu_message_id"] if row else None
+
+
+def set_user_reply_menu_message(user_id: int, message_id: int | None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO user_reply_menu_state (user_id, parent_id, menu_message_id, updated_at)
+        VALUES (?, NULL, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            menu_message_id = excluded.menu_message_id,
+            updated_at = excluded.updated_at
+    """, (user_id, message_id, _now_iso()))
+    conn.commit()
+    conn.close()
+
+
+def get_user_reply_message_ids(user_id: int) -> list[int]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT reply_message_ids FROM user_reply_menu_state WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row or not row["reply_message_ids"]:
+        return []
+    try:
+        ids = json.loads(row["reply_message_ids"])
+    except json.JSONDecodeError:
+        return []
+    return [int(message_id) for message_id in ids if isinstance(message_id, int)]
+
+
+def set_user_reply_message_ids(user_id: int, message_ids: list[int]):
+    raw_ids = json.dumps(message_ids) if message_ids else None
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO user_reply_menu_state (user_id, parent_id, reply_message_ids, updated_at)
+        VALUES (?, NULL, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            reply_message_ids = excluded.reply_message_ids,
+            updated_at = excluded.updated_at
+    """, (user_id, raw_ids, _now_iso()))
     conn.commit()
     conn.close()
 

@@ -28,8 +28,12 @@ from database import (
     get_main_greeting,
     get_menu_media,
     get_menu_node,
+    get_user_reply_menu_message,
+    get_user_reply_message_ids,
     get_user_reply_menu_parent,
     list_menu_children,
+    set_user_reply_menu_message,
+    set_user_reply_message_ids,
     set_user_reply_menu_parent,
 )
 
@@ -93,10 +97,45 @@ def build_reply_menu_keyboard(parent_id: int | None) -> ReplyKeyboardMarkup | No
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
-async def send_reply_menu_if_any(target: Message):
+async def send_reply_menu_if_any(target: Message, user_id: int | None = None):
     keyboard = build_reply_menu_keyboard(None)
     if keyboard:
-        await target.answer("Меню:", reply_markup=keyboard)
+        sent = await target.answer("Меню:", reply_markup=keyboard)
+        owner_id = user_id if user_id is not None else (target.from_user.id if target.from_user else None)
+        if owner_id:
+            set_user_reply_menu_parent(owner_id, None)
+            set_user_reply_menu_message(owner_id, sent.message_id)
+            set_user_reply_message_ids(owner_id, [])
+
+
+async def delete_processed_reply_message(message: Message):
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+
+async def delete_stored_reply_messages(message: Message):
+    if not message.from_user:
+        return
+    message_ids = []
+    menu_message_id = get_user_reply_menu_message(message.from_user.id)
+    if menu_message_id:
+        message_ids.append(menu_message_id)
+    message_ids.extend(get_user_reply_message_ids(message.from_user.id))
+
+    seen_ids = set()
+    for message_id in message_ids:
+        if message_id in seen_ids or message_id == message.message_id:
+            continue
+        seen_ids.add(message_id)
+        try:
+            await message.bot.delete_message(message.chat.id, message_id)
+        except Exception:
+            pass
+
+    set_user_reply_menu_message(message.from_user.id, None)
+    set_user_reply_message_ids(message.from_user.id, [])
 
 
 def _entities_to_json(entities: list[MessageEntity] | None) -> str | None:
@@ -267,19 +306,20 @@ def _album_media_item(item: dict[str, Any]):
     return None
 
 
-async def _send_node_content(bot: Bot, chat_id: int, node: dict[str, Any], reply_markup):
+async def _send_node_content(bot: Bot, chat_id: int, node: dict[str, Any], reply_markup) -> list[Message]:
     content_type = node.get("content_type")
     entities = entities_from_json(node.get("entities_json"))
     caption_entities = entities_from_json(node.get("caption_entities_json"))
     if content_type == "text" or not content_type:
-        await bot.send_message(
+        sent = await bot.send_message(
             chat_id=chat_id,
             text=node.get("text") or node["title"],
             entities=entities,
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "photo":
-        await bot.send_photo(
+        sent = await bot.send_photo(
             chat_id=chat_id,
             photo=node["media_file_id"],
             caption=node.get("caption"),
@@ -288,8 +328,9 @@ async def _send_node_content(bot: Bot, chat_id: int, node: dict[str, Any], reply
             has_spoiler=bool(node.get("has_spoiler")),
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "video":
-        await bot.send_video(
+        sent = await bot.send_video(
             chat_id=chat_id,
             video=node["media_file_id"],
             caption=node.get("caption"),
@@ -298,8 +339,9 @@ async def _send_node_content(bot: Bot, chat_id: int, node: dict[str, Any], reply
             has_spoiler=bool(node.get("has_spoiler")),
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "animation":
-        await bot.send_animation(
+        sent = await bot.send_animation(
             chat_id=chat_id,
             animation=node["media_file_id"],
             caption=node.get("caption"),
@@ -308,51 +350,64 @@ async def _send_node_content(bot: Bot, chat_id: int, node: dict[str, Any], reply
             has_spoiler=bool(node.get("has_spoiler")),
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "document":
-        await bot.send_document(
+        sent = await bot.send_document(
             chat_id=chat_id,
             document=node["media_file_id"],
             caption=node.get("caption"),
             caption_entities=caption_entities,
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "audio":
-        await bot.send_audio(
+        sent = await bot.send_audio(
             chat_id=chat_id,
             audio=node["media_file_id"],
             caption=node.get("caption"),
             caption_entities=caption_entities,
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "voice":
-        await bot.send_voice(
+        sent = await bot.send_voice(
             chat_id=chat_id,
             voice=node["media_file_id"],
             caption=node.get("caption"),
             caption_entities=caption_entities,
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "sticker":
-        await bot.send_sticker(
+        sent = await bot.send_sticker(
             chat_id=chat_id,
             sticker=node["media_file_id"],
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "video_note":
-        await bot.send_video_note(
+        sent = await bot.send_video_note(
             chat_id=chat_id,
             video_note=node["media_file_id"],
             reply_markup=reply_markup,
         )
+        return [sent]
     elif content_type == "album":
         media = [_album_media_item(item) for item in get_menu_media(node["id"])]
         media = [item for item in media if item is not None]
+        sent_messages = []
         if media:
-            await bot.send_media_group(chat_id=chat_id, media=media)
+            sent_messages.extend(await bot.send_media_group(chat_id=chat_id, media=media))
+            if isinstance(reply_markup, ReplyKeyboardMarkup):
+                sent = await bot.send_message(chat_id=chat_id, text="Меню:", reply_markup=reply_markup)
+                sent_messages.append(sent)
         else:
-            await bot.send_message(chat_id=chat_id, text=node["title"], reply_markup=reply_markup)
+            sent = await bot.send_message(chat_id=chat_id, text=node["title"], reply_markup=reply_markup)
+            sent_messages.append(sent)
+        return sent_messages
     else:
-        await bot.send_message(chat_id=chat_id, text=node["title"], reply_markup=reply_markup)
+        sent = await bot.send_message(chat_id=chat_id, text=node["title"], reply_markup=reply_markup)
+        return [sent]
 
 
 async def send_dynamic_node(callback: CallbackQuery, node_id: int):
@@ -376,15 +431,11 @@ async def send_dynamic_node(callback: CallbackQuery, node_id: int):
 
 async def send_reply_node(message: Message, node: dict[str, Any]):
     has_children = bool(list_menu_children(node["id"], menu_type="reply"))
-    content_type = node.get("content_type")
 
     if node["kind"] == "url":
         set_user_reply_menu_parent(message.from_user.id, node["parent_id"])
-        await message.answer(node["url"], reply_markup=build_reply_menu_keyboard(node["parent_id"]))
-        return
-
-    if content_type == "album":
-        await _send_node_content(message.bot, message.chat.id, node, reply_markup=None)
+        sent = await message.answer(node["url"], reply_markup=build_reply_menu_keyboard(node["parent_id"]))
+        set_user_reply_message_ids(message.from_user.id, [sent.message_id])
         return
 
     set_user_reply_menu_parent(message.from_user.id, node["id"])
@@ -392,7 +443,8 @@ async def send_reply_node(message: Message, node: dict[str, Any]):
     if not keyboard and not has_children:
         keyboard = build_reply_menu_keyboard(node["parent_id"])
         set_user_reply_menu_parent(message.from_user.id, node["parent_id"])
-    await _send_node_content(message.bot, message.chat.id, node, keyboard)
+    sent_messages = await _send_node_content(message.bot, message.chat.id, node, keyboard)
+    set_user_reply_message_ids(message.from_user.id, [sent.message_id for sent in sent_messages])
 
 
 async def handle_reply_menu_message(message: Message) -> bool:
@@ -404,17 +456,30 @@ async def handle_reply_menu_message(message: Message) -> bool:
     if message.text == REPLY_BACK_TEXT:
         current = get_menu_node(parent_id) if parent_id is not None else None
         next_parent_id = current["parent_id"] if current else None
+        await delete_stored_reply_messages(message)
+        await delete_processed_reply_message(message)
         set_user_reply_menu_parent(message.from_user.id, next_parent_id)
         keyboard = build_reply_menu_keyboard(next_parent_id)
         if keyboard:
             text = "Меню:" if next_parent_id is None else current["title"]
-            await message.answer(text, reply_markup=keyboard)
+            sent = await message.answer(text, reply_markup=keyboard)
+            if next_parent_id is None:
+                set_user_reply_menu_message(message.from_user.id, sent.message_id)
+                set_user_reply_message_ids(message.from_user.id, [])
+            else:
+                set_user_reply_message_ids(message.from_user.id, [sent.message_id])
             return True
         return False
 
     node = find_menu_child_by_title(parent_id, message.text, menu_type="reply")
+    if not node and parent_id is not None:
+        node = find_menu_child_by_title(None, message.text, menu_type="reply")
+        if node:
+            set_user_reply_menu_parent(message.from_user.id, None)
     if not node:
         return False
 
+    await delete_stored_reply_messages(message)
+    await delete_processed_reply_message(message)
     await send_reply_node(message, node)
     return True
